@@ -186,24 +186,52 @@ function auth(req, res, next) {
 
 app.post("/auth/register", async (req, res) => {
     try {
+        const username = String(req.body.username || "").trim();
         const email = String(req.body.email || "").trim().toLowerCase();
         const password = String(req.body.password || "");
 
-        if (!email || !email.includes("@")) return res.status(400).json({ error: "Bad email" });
-        if (password.length < 6) return res.status(400).json({ error: "Password too short (min 6)" });
+        if (!username || username.length < 3) {
+            return res.status(400).json({ error: "Username must have at least 3 characters" });
+        }
 
-        const exists = await pool.query("SELECT id FROM users WHERE email=$1", [email]);
-        if (exists.rows.length) return res.status(409).json({ error: "Email already used" });
+        const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        if (!emailOk) {
+            return res.status(400).json({ error: "Bad email" });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({ error: "Password too short (min 6)" });
+        }
+
+        const existsEmail = await pool.query(
+            "SELECT id FROM users WHERE email = $1",
+            [email]
+        );
+        if (existsEmail.rows.length) {
+            return res.status(409).json({ error: "Email already used" });
+        }
+
+        const existsUsername = await pool.query(
+            "SELECT id FROM users WHERE username = $1",
+            [username]
+        );
+        if (existsUsername.rows.length) {
+            return res.status(409).json({ error: "Username already used" });
+        }
 
         const hash = await bcrypt.hash(password, 10);
 
         const r = await pool.query(
-            "INSERT INTO users (email, password_hash) VALUES ($1,$2) RETURNING id,email",
-            [email, hash]
+            "INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email",
+            [username, email, hash]
         );
 
         const user = r.rows[0];
-        const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: "7d" });
+        const token = jwt.sign(
+            { id: user.id, email: user.email, username: user.username },
+            process.env.JWT_SECRET,
+            { expiresIn: "7d" }
+        );
 
         res.json({ user, token });
     } catch (e) {
@@ -213,27 +241,78 @@ app.post("/auth/register", async (req, res) => {
 
 app.post("/auth/login", async (req, res) => {
     try {
-        const email = String(req.body.email || "").trim().toLowerCase();
+        const login = String(req.body.login || "").trim();
         const password = String(req.body.password || "");
 
-        if (!email || !password) return res.status(400).json({ error: "Missing data" });
+        if (!login || !password) {
+            return res.status(400).json({ error: "Missing data" });
+        }
 
-        const r = await pool.query("SELECT id,email,password_hash FROM users WHERE email=$1", [email]);
-        if (!r.rows.length) return res.status(401).json({ error: "Wrong email or password" });
+        const r = await pool.query(
+            "SELECT id, username, email, password_hash FROM users WHERE email = $1 OR username = $1",
+            [login.toLowerCase()]
+        );
+
+        if (!r.rows.length) {
+            const r2 = await pool.query(
+                "SELECT id, username, email, password_hash FROM users WHERE username = $1",
+                [login]
+            );
+
+            if (!r2.rows.length) {
+                return res.status(401).json({ error: "Wrong login or password" });
+            }
+
+            const u2 = r2.rows[0];
+            const ok2 = await bcrypt.compare(password, u2.password_hash);
+            if (!ok2) {
+                return res.status(401).json({ error: "Wrong login or password" });
+            }
+
+            const token2 = jwt.sign(
+                { id: u2.id, email: u2.email, username: u2.username },
+                process.env.JWT_SECRET,
+                { expiresIn: "7d" }
+            );
+
+            return res.json({
+                user: { id: u2.id, username: u2.username, email: u2.email },
+                token: token2
+            });
+        }
 
         const u = r.rows[0];
         const ok = await bcrypt.compare(password, u.password_hash);
-        if (!ok) return res.status(401).json({ error: "Wrong email or password" });
+        if (!ok) {
+            return res.status(401).json({ error: "Wrong login or password" });
+        }
 
-        const token = jwt.sign({ id: u.id, email: u.email }, process.env.JWT_SECRET, { expiresIn: "7d" });
-        res.json({ user: { id: u.id, email: u.email }, token });
+        const token = jwt.sign(
+            { id: u.id, email: u.email, username: u.username },
+            process.env.JWT_SECRET,
+            { expiresIn: "7d" }
+        );
+
+        res.json({
+            user: { id: u.id, username: u.username, email: u.email },
+            token
+        });
     } catch (e) {
         res.status(500).json({ error: "Login failed" });
     }
 });
 
 app.get("/auth/me", auth, async (req, res) => {
-    res.json({ user: req.user });
+    const r = await pool.query(
+        "SELECT id, username, email FROM users WHERE id = $1",
+        [req.user.id]
+    );
+
+    if (!r.rows.length) {
+        return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ user: r.rows[0] });
 });
 
 // ===== EXPENSES =====

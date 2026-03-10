@@ -81,8 +81,15 @@ function App() {
 
     const [token, setToken] = useState(() => localStorage.getItem("token") || "");
     const [currentUser, setCurrentUser] = useState(null);
-    const [authEmail, setAuthEmail] = useState("");
-    const [authPass, setAuthPass] = useState("");
+    const [registerUsername, setRegisterUsername] = useState("");
+    const [registerEmail, setRegisterEmail] = useState("");
+    const [registerPassword, setRegisterPassword] = useState("");
+
+    const [loginValue, setLoginValue] = useState("");
+    const [loginPassword, setLoginPassword] = useState("");
+
+    const [authMode, setAuthMode] = useState("login");
+
     const [authError, setAuthError] = useState("");
 
     const [newCategoryName, setNewCategoryName] = useState("");
@@ -775,8 +782,8 @@ function App() {
                         {token ? (
                             <>
                                 <div className="topbar-user-info">
-                                    <strong>{currentUser?.email || "Logged user"}</strong>
-                                    <span>{selectedPeriodLabel}</span>
+                                    <strong>{currentUser?.username || currentUser?.email || "Logged user"}</strong>
+                                    <span>{currentUser?.email || selectedPeriodLabel}</span>
                                 </div>
                                 <button className="btn-secondary" onClick={logout}>
                                     Logout
@@ -792,87 +799,209 @@ function App() {
                 </header>
 
                 {!token ? (
-                    <section className="panel auth-panel">
-                        <div className="section-head">
-                            <div>
-                                <div className="section-label">Access</div>
-                                <h3 className="section-title">Account</h3>
-                                <p className="section-text">
-                                    Register a new account or log in to work with your own financial data.
-                                </p>
+                    <section className="auth-hero">
+                        <div className="auth-hero__left">
+                            <div className="auth-hero__badge">Student Expense Tracker</div>
+
+                            <h1 className="auth-hero__title">
+                                Take control of your student budget.
+                            </h1>
+
+                            <p className="auth-hero__text">
+                                Track expenses, manage incomes, set monthly budgets and analyze your
+                                spending in one clean dashboard.
+                            </p>
+
+                            <div className="auth-hero__features">
+                                <div className="auth-feature">
+                                    <div className="auth-feature__icon">✓</div>
+                                    <div>
+                                        <div className="auth-feature__title">Smart budget tracking</div>
+                                        <div className="auth-feature__text">
+                                            Monitor limits and see when spending gets too high.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="auth-feature">
+                                    <div className="auth-feature__icon">✓</div>
+                                    <div>
+                                        <div className="auth-feature__title">Simple expense categories</div>
+                                        <div className="auth-feature__text">
+                                            Keep all records structured and easy to find.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="auth-feature">
+                                    <div className="auth-feature__icon">✓</div>
+                                    <div>
+                                        <div className="auth-feature__title">Useful statistics</div>
+                                        <div className="auth-feature__text">
+                                            Understand where your money goes.
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="form-row">
-                            <input
-                                className="input"
-                                placeholder="Email"
-                                value={authEmail}
-                                onChange={e => setAuthEmail(e.target.value)}
-                            />
-                            <input
-                                className="input"
-                                type="password"
-                                placeholder="Password"
-                                value={authPass}
-                                onChange={e => setAuthPass(e.target.value)}
-                            />
-                            <button
-                                className="btn-primary"
-                                onClick={async () => {
-                                    try {
-                                        setAuthError("");
-                                        const r = await fetch("/api/auth/register", {
-                                            method: "POST",
-                                            headers: { "Content-Type": "application/json" },
-                                            body: JSON.stringify({ email: authEmail, password: authPass }),
-                                        });
+                        <div className="auth-hero__right">
+                            <div className="auth-card-modern">
+                                <div className="auth-card-modern__header">
+                                    <h2>{authMode === "login" ? "Welcome back" : "Create account"}</h2>
+                                    <p>
+                                        {authMode === "login"
+                                            ? "Sign in to continue managing your finances"
+                                            : "Create a new account to start tracking your budget"}
+                                    </p>
+                                </div>
 
-                                        const data = await r.json();
-                                        if (!r.ok) throw new Error(data.error || "Register failed");
+                                <div className="auth-switch">
+                                    <button
+                                        type="button"
+                                        className={authMode === "login" ? "auth-switch__btn active" : "auth-switch__btn"}
+                                        onClick={() => {
+                                            setAuthMode("login");
+                                            setAuthError("");
+                                        }}
+                                    >
+                                        Login
+                                    </button>
 
-                                        localStorage.setItem("token", data.token);
-                                        setToken(data.token);
-                                        setCurrentUser(data.user || null);
-                                        setAuthEmail("");
-                                        setAuthPass("");
-                                    } catch (e) {
-                                        setAuthError(String(e.message || e));
-                                    }
-                                }}
-                            >
-                                Register
-                            </button>
+                                    <button
+                                        type="button"
+                                        className={authMode === "register" ? "auth-switch__btn active" : "auth-switch__btn"}
+                                        onClick={() => {
+                                            setAuthMode("register");
+                                            setAuthError("");
+                                        }}
+                                    >
+                                        Register
+                                    </button>
+                                </div>
 
-                            <button
-                                className="btn-secondary"
-                                onClick={async () => {
-                                    try {
-                                        setAuthError("");
-                                        const r = await fetch("/api/auth/login", {
-                                            method: "POST",
-                                            headers: { "Content-Type": "application/json" },
-                                            body: JSON.stringify({ email: authEmail, password: authPass }),
-                                        });
+                                {authMode === "login" ? (
+                                    <div className="auth-form-modern">
+                                        <label className="auth-form-modern__label">Username or email</label>
+                                        <input
+                                            className="auth-form-modern__input"
+                                            placeholder="Enter username or email"
+                                            value={loginValue}
+                                            onChange={e => setLoginValue(e.target.value)}
+                                        />
 
-                                        const data = await r.json();
-                                        if (!r.ok) throw new Error(data.error || "Login failed");
+                                        <label className="auth-form-modern__label">Password</label>
+                                        <input
+                                            className="auth-form-modern__input"
+                                            type="password"
+                                            placeholder="Enter password"
+                                            value={loginPassword}
+                                            onChange={e => setLoginPassword(e.target.value)}
+                                        />
 
-                                        localStorage.setItem("token", data.token);
-                                        setToken(data.token);
-                                        setCurrentUser(data.user || null);
-                                        setAuthEmail("");
-                                        setAuthPass("");
-                                    } catch (e) {
-                                        setAuthError(String(e.message || e));
-                                    }
-                                }}
-                            >
-                                Login
-                            </button>
+                                        <button
+                                            className="auth-form-modern__submit"
+                                            onClick={async () => {
+                                                try {
+                                                    setAuthError("");
+
+                                                    const r = await fetch("/api/auth/login", {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({
+                                                            login: loginValue,
+                                                            password: loginPassword
+                                                        }),
+                                                    });
+
+                                                    const data = await r.json();
+                                                    if (!r.ok) throw new Error(data.error || "Login failed");
+
+                                                    localStorage.setItem("token", data.token);
+                                                    setToken(data.token);
+                                                    setCurrentUser(data.user || null);
+
+                                                    setLoginValue("");
+                                                    setLoginPassword("");
+                                                    setRegisterUsername("");
+                                                    setRegisterEmail("");
+                                                    setRegisterPassword("");
+                                                } catch (e) {
+                                                    setAuthError(String(e.message || e));
+                                                }
+                                            }}
+                                        >
+                                            Login
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="auth-form-modern">
+                                        <label className="auth-form-modern__label">Username</label>
+                                        <input
+                                            className="auth-form-modern__input"
+                                            placeholder="Choose username"
+                                            value={registerUsername}
+                                            onChange={e => setRegisterUsername(e.target.value)}
+                                        />
+
+                                        <label className="auth-form-modern__label">Email</label>
+                                        <input
+                                            className="auth-form-modern__input"
+                                            placeholder="Enter email"
+                                            value={registerEmail}
+                                            onChange={e => setRegisterEmail(e.target.value)}
+                                        />
+
+                                        <label className="auth-form-modern__label">Password</label>
+                                        <input
+                                            className="auth-form-modern__input"
+                                            type="password"
+                                            placeholder="Create password"
+                                            value={registerPassword}
+                                            onChange={e => setRegisterPassword(e.target.value)}
+                                        />
+
+                                        <button
+                                            className="auth-form-modern__submit auth-form-modern__submit--dark"
+                                            onClick={async () => {
+                                                try {
+                                                    setAuthError("");
+
+                                                    const r = await fetch("/api/auth/register", {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({
+                                                            username: registerUsername,
+                                                            email: registerEmail,
+                                                            password: registerPassword
+                                                        }),
+                                                    });
+
+                                                    const data = await r.json();
+                                                    if (!r.ok) throw new Error(data.error || "Register failed");
+
+                                                    localStorage.setItem("token", data.token);
+                                                    setToken(data.token);
+                                                    setCurrentUser(data.user || null);
+
+                                                    setRegisterUsername("");
+                                                    setRegisterEmail("");
+                                                    setRegisterPassword("");
+                                                    setLoginValue("");
+                                                    setLoginPassword("");
+                                                } catch (e) {
+                                                    setAuthError(String(e.message || e));
+                                                }
+                                            }}
+                                        >
+                                            Create account
+                                        </button>
+                                    </div>
+                                )}
+
+                                {authError ? <p className="auth-form-modern__error">{authError}</p> : null}
+                            </div>
                         </div>
-
-                        {authError ? <p className="error-text">{authError}</p> : null}
                     </section>
                 ) : (
                     <>
