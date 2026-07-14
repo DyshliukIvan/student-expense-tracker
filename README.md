@@ -1,35 +1,34 @@
 # Student Expense Tracker
 
-Project for the course **Extrémne programovanie**.
+Full-stack personal finance application for recording income and expenses, organizing transactions by category, setting a budget, and reviewing spending statistics. Built as a course project with a containerized local environment.
 
-Stack:
-- React (Vite)
-- Node.js + Express
-- PostgreSQL
-- Docker Compose
+## Features
 
-Features:
-- Track expenses
-- Track income
-- Categories
-- Budget
-- Statistics
+- Record income and expense transactions
+- Organize transactions by category
+- Track a personal budget
+- Review financial statistics
+- Run the complete stack with one Docker Compose command
 
-## Run Full Project With Docker Compose
+## Tech stack
+
+- **Frontend:** React, Vite, JavaScript
+- **Backend:** Node.js, Express
+- **Database:** PostgreSQL
+- **Infrastructure:** Docker, Docker Compose
+
+## Run locally
 
 From the project root:
 
-```bash
-docker compose up --build
-```
+    docker compose up --build
 
-Services:
+The services will be available at:
+
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:3000
-- PostgreSQL: localhost:5432 (`app` / `app`, DB `expenses`)
+- PostgreSQL: localhost:5432
 
-Stop all containers:
+Stop the stack with:
 
-```bash
-docker compose down
-```
+    docker compose down
