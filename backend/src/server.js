@@ -14,10 +14,23 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// список расходов
-let expenses = [];
-let nextId = 1;
+function positiveAmount(value) {
+    const amount = Number(value);
+    return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
 
+async function ensureDatabaseSchema() {
+    // Older local volumes used INTEGER for money. Keep existing installations
+    // compatible with the current UI, which supports cents.
+    await pool.query(`
+        ALTER TABLE expenses
+            ALTER COLUMN amount TYPE NUMERIC(12, 2) USING amount::NUMERIC(12, 2);
+        ALTER TABLE incomes
+            ALTER COLUMN amount TYPE NUMERIC(12, 2) USING amount::NUMERIC(12, 2);
+        ALTER TABLE budgets
+            ALTER COLUMN amount TYPE NUMERIC(12, 2) USING amount::NUMERIC(12, 2);
+    `);
+}
 
 // проверить что сервер работает
 app.get("/", (req, res) => {
@@ -128,6 +141,10 @@ app.get("/budgets/:month", auth, async (req, res) => {
 
 app.post("/budgets", auth, async (req, res) => {
     const { month, amount } = req.body;
+    const parsedAmount = positiveAmount(amount);
+    if (!month || parsedAmount === null) {
+        return res.status(400).json({ error: "Month and a positive amount are required" });
+    }
     const m = month + "-01";
 
     const r = await pool.query(
@@ -135,7 +152,7 @@ app.post("/budgets", auth, async (req, res) => {
          VALUES ($1, $2, $3)
              ON CONFLICT (user_id, month) DO UPDATE SET amount = EXCLUDED.amount
                                                  RETURNING *`,
-        [m, amount, req.user.id]
+        [m, parsedAmount, req.user.id]
     );
 
     res.json(r.rows[0]);
@@ -352,9 +369,15 @@ app.get("/expenses", auth, async (req, res) => {
 app.post("/expenses", auth, async (req, res) => {
     const { category_id, amount, note } = req.body;
 
+    const parsedCategoryId = Number(category_id);
+    const parsedAmount = positiveAmount(amount);
+    if (!Number.isInteger(parsedCategoryId) || parsedAmount === null) {
+        return res.status(400).json({ error: "A category and a positive amount are required" });
+    }
+
     const result = await pool.query(
         "INSERT INTO expenses (user_id, category_id, amount, note) VALUES ($1, $2, $3, $4) RETURNING *",
-        [req.user.id, category_id, amount, note]
+        [req.user.id, parsedCategoryId, parsedAmount, note]
     );
 
     res.json(result.rows[0]);
@@ -374,13 +397,19 @@ app.delete("/expenses/:id", auth, async (req, res) => {
 app.put("/expenses/:id", auth, async (req, res) => {
     const id = Number(req.params.id);
     const { category_id, amount, note } = req.body;
+    const parsedCategoryId = Number(category_id);
+    const parsedAmount = positiveAmount(amount);
+
+    if (!Number.isInteger(parsedCategoryId) || parsedAmount === null) {
+        return res.status(400).json({ error: "A category and a positive amount are required" });
+    }
 
     const result = await pool.query(
         `UPDATE expenses
          SET category_id=$1, amount=$2, note=$3
          WHERE id=$4 AND user_id=$5
              RETURNING *`,
-        [category_id, amount, note, id, req.user.id]
+        [parsedCategoryId, parsedAmount, note, id, req.user.id]
     );
 
     if (!result.rows.length) {
@@ -419,10 +448,15 @@ app.get("/incomes", auth, async (req, res) => {
 
 app.post("/incomes", auth, async (req, res) => {
     const { category, amount, note } = req.body;
+    const parsedAmount = positiveAmount(amount);
+
+    if (!category || parsedAmount === null) {
+        return res.status(400).json({ error: "A category and a positive amount are required" });
+    }
 
     const result = await pool.query(
         "INSERT INTO incomes (user_id, category, amount, note) VALUES ($1, $2, $3, $4) RETURNING *",
-        [req.user.id, category, amount, note]
+        [req.user.id, category, parsedAmount, note]
     );
 
     res.json(result.rows[0]);
@@ -442,10 +476,15 @@ app.delete("/incomes/:id", auth, async (req, res) => {
 app.put("/incomes/:id", auth, async (req, res) => {
     const id = Number(req.params.id);
     const { category, amount, note } = req.body;
+    const parsedAmount = positiveAmount(amount);
+
+    if (!category || parsedAmount === null) {
+        return res.status(400).json({ error: "A category and a positive amount are required" });
+    }
 
     const result = await pool.query(
         "UPDATE incomes SET category=$1, amount=$2, note=$3 WHERE id=$4 AND user_id=$5 RETURNING *",
-        [category, amount, note, id, req.user.id]
+        [category, parsedAmount, note, id, req.user.id]
     );
 
     if (!result.rows.length) {
@@ -641,6 +680,13 @@ app.get("/export/incomes.csv", auth, async (req, res) => {
 
 const port = Number(process.env.PORT || 3000);
 
-app.listen(port, () => {
-    console.log(`Server started on port ${port}`);
-});
+ensureDatabaseSchema()
+    .then(() => {
+        app.listen(port, () => {
+            console.log(`Server started on port ${port}`);
+        });
+    })
+    .catch((error) => {
+        console.error("Database migration failed", error);
+        process.exit(1);
+    });

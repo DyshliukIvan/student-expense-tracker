@@ -71,6 +71,7 @@ function App() {
     const [budgetAmount, setBudgetAmount] = useState("");
     const [budgetStatus, setBudgetStatus] = useState(null);
     const [budgetError, setBudgetError] = useState("");
+    const [exportError, setExportError] = useState("");
 
     const [fromDate, setFromDate] = useState("");
     const [toDate, setToDate] = useState("");
@@ -129,7 +130,7 @@ function App() {
 
             const data = await r.json();
             setCurrentUser(data.user || null);
-        } catch (e) {
+        } catch {
             setCurrentUser(null);
         }
     }
@@ -164,7 +165,7 @@ function App() {
             if (!r.ok) throw new Error("load incomes failed");
             const data = await r.json();
             setIncomes(data);
-        } catch (e) {
+        } catch {
             setIncomeError("Failed to load incomes");
         }
     }
@@ -198,7 +199,7 @@ function App() {
             if (!r.ok) throw new Error("load budget failed");
             const data = await r.json();
             setBudgetAmount(data && data.amount != null ? String(data.amount) : "");
-        } catch (e) {
+        } catch {
             setBudgetError("Failed to load budget");
         }
     }
@@ -210,7 +211,7 @@ function App() {
             if (!r.ok) throw new Error("load status failed");
             const data = await r.json();
             setBudgetStatus(data);
-        } catch (e) {
+        } catch {
             setBudgetError("Failed to load budget status");
         }
     }
@@ -226,7 +227,9 @@ function App() {
 
             setStatCat(await r1.json());
             setStatFlow(await r2.json());
-        } catch (e) {
+        } catch {
+            setStatCat([]);
+            setStatFlow([]);
         }
     }
 
@@ -323,7 +326,7 @@ function App() {
             if (!r.ok) throw new Error("save budget failed");
 
             await loadBudgetStatus();
-        } catch (e) {
+        } catch {
             setBudgetError("Failed to save budget");
         }
     }
@@ -354,8 +357,8 @@ function App() {
             });
 
             if (!res.ok) {
-                const t = await res.text();
-                throw new Error(t || "Failed to add expense");
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || "Failed to add expense");
             }
 
             setAmount("");
@@ -381,7 +384,7 @@ function App() {
             setExpenses(expenses.filter(e => e.id !== id));
             loadStats();
             loadBudgetStatus();
-        } catch (e) {
+        } catch {
             setError("Failed to delete expense");
         }
     }
@@ -421,7 +424,7 @@ function App() {
             await loadStats();
             await loadBudgetStatus();
             setEditingExpenseId(null);
-        } catch (e) {
+        } catch {
             setError("Failed to update expense");
         }
     }
@@ -450,7 +453,7 @@ function App() {
 
             await loadIncomes();
             await loadStats();
-        } catch (e) {
+        } catch {
             setIncomeError("Failed to add income");
         }
     }
@@ -462,7 +465,7 @@ function App() {
             if (!r.ok) throw new Error("delete income failed");
             setIncomes(incomes.filter(i => i.id !== id));
             loadStats();
-        } catch (e) {
+        } catch {
             setIncomeError("Failed to delete income");
         }
     }
@@ -499,19 +502,39 @@ function App() {
             await loadIncomes();
             await loadStats();
             setEditingIncomeId(null);
-        } catch (e) {
+        } catch {
             setIncomeError("Failed to update income");
+        }
+    }
+
+    async function downloadCsv(url, filename) {
+        try {
+            setExportError("");
+            const r = await apiFetch(url);
+            if (!r.ok) throw new Error("export failed");
+
+            const blob = await r.blob();
+            const href = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = href;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(href);
+        } catch {
+            setExportError("Failed to export CSV");
         }
     }
 
     function downloadExpensesCsv() {
         const q = buildQuery(fromDate, toDate);
-        window.location.href = "/api/export/expenses.csv" + q;
+        downloadCsv("/api/export/expenses.csv" + q, "expenses.csv");
     }
 
     function downloadIncomesCsv() {
         const q = buildQuery(fromDate, toDate);
-        window.location.href = "/api/export/incomes.csv" + q;
+        downloadCsv("/api/export/incomes.csv" + q, "incomes.csv");
     }
 
     function applyFilters() {
@@ -541,6 +564,7 @@ function App() {
         setStatCat([]);
         setStatFlow([]);
         setBudgetStatus(null);
+        setExportError("");
         setActivePage("dashboard");
     }
 
@@ -555,12 +579,14 @@ function App() {
         loadBudget().catch(() => setBudgetError("Failed to load budget"));
         loadBudgetStatus().catch(() => setBudgetError("Failed to load budget status"));
         loadStats();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token]);
 
     useEffect(() => {
         if (!token) return;
         loadBudget();
         loadBudgetStatus();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [budgetMonth]);
 
 
@@ -1729,6 +1755,8 @@ function App() {
                                             Export Incomes CSV
                                         </button>
                                     </div>
+
+                                    {exportError ? <p className="error-text">{exportError}</p> : null}
 
                                     <div className="export-note">
                                         Selected period: {selectedPeriodLabel}

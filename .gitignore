@@ -1,6 +1,7 @@
 .idea/
 .env
 node_modules/
+.pnpm-store/
 backend/node_modules/
 frontend/node_modules/
 dist/

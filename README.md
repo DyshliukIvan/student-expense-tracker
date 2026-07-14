@@ -1,34 +1,43 @@
 # Student Expense Tracker
 
-Full-stack personal finance application for recording income and expenses, organizing transactions by category, setting a budget, and reviewing spending statistics. Built as a course project with a containerized local environment.
+A full-stack personal-finance dashboard designed for students. Built as a course project, it combines authenticated expense and income tracking, monthly budgets, charts, filtering, and exports in one responsive interface.
 
-## Features
+![Student Expense Tracker dashboard](docs/screenshots/dashboard.png)
 
-- Record income and expense transactions
-- Organize transactions by category
-- Track a personal budget
-- Review financial statistics
-- Run the complete stack with one Docker Compose command
+## Highlights
 
-## Tech stack
+- Secure registration and JWT-based login
+- Expenses and incomes with categories, notes, filters, editing, and deletion
+- Monthly budget tracking with live balance and spending status
+- Dashboard summaries and Chart.js visualizations
+- CSV export for personal reporting
+- PostgreSQL schema migration for precise decimal amounts
+- Docker Compose setup for the complete stack
+- Frontend lint/build and backend syntax checks in CI
 
-- **Frontend:** React, Vite, JavaScript
-- **Backend:** Node.js, Express
-- **Database:** PostgreSQL
-- **Infrastructure:** Docker, Docker Compose
+## Stack
+
+- React 19, Vite, Chart.js
+- Node.js, Express, PostgreSQL
+- Docker Compose
 
 ## Run locally
 
-From the project root:
-
-    docker compose up --build
+```bash
+docker compose up --build
+```
 
 The services will be available at:
 
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3000
-- PostgreSQL: localhost:5432
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:3000`
+- PostgreSQL: `localhost:5432` (`app` / `app`, database `expenses`)
 
-Stop the stack with:
+The backend upgrades existing amount columns to `NUMERIC(12, 2)` on startup, so existing Docker volumes can be reused safely.
 
-    docker compose down
+## Verify
+
+```bash
+cd frontend && npm ci && npm run lint && npm run build
+cd ../backend && npm ci && npm test
+```
